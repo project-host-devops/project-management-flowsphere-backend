@@ -3,7 +3,7 @@ name: FlowSphere Backend CI/CD (Dev)
 on:
   push:
     branches:
-      - dev
+      - feature
   workflow_dispatch:
 
 jobs:
