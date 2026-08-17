@@ -30,7 +30,7 @@ def upgrade() -> None:
     sa.Column('summary', sa.String(length=255), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('issue_type', sa.Enum('BUG', 'STORY', 'TASK', 'EPIC', 'IMPROVEMENT', name='issue_type'), nullable=False),
-    sa.Column('priority', sa.String(length=20), nullable=False),
+    sa.Column('priority', sa.Enum('LOW', 'MEDIUM', 'HIGH', 'CRITICAL', name='issue_priority'), nullable=False),
     sa.Column('status', sa.Enum('TO_DO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'CLOSED', name='issue_status'), nullable=False),
     sa.Column('due_date', sa.Date(), nullable=True),
     sa.Column('story_points', sa.Integer(), nullable=True),
