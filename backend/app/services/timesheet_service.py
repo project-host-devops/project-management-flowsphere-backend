@@ -24,10 +24,6 @@ from app.repositories.subtask_repository import (
 from app.schemas.timesheet_schema import (
     TimesheetApprove,
     TimesheetCreate,
-    TimesheetFilter,
-    TimesheetSort,
-    TimesheetPagination,
-    TimesheetReject,
     TimesheetUpdate,
 )
 
@@ -60,12 +56,20 @@ class TimesheetService:
         payload: TimesheetCreate,
     ):
 
+        # ------------------------------------------------------
+        # 1. Validate Project
+        # ------------------------------------------------------
+
         project = await self.project_repo.get_by_id(
             payload.project_id
         )
 
         if not project:
             raise ResourceNotFoundException("Project")
+
+        # ------------------------------------------------------
+        # 2. Validate Task
+        # ------------------------------------------------------
 
         task = await self.task_repo.get_by_id(
             payload.task_id
@@ -74,28 +78,13 @@ class TimesheetService:
         if not task:
             raise ResourceNotFoundException("Task")
 
-        subtask = await self.subtask_repo.get_by_id(
-            payload.subtask_id
-        )
+        # ------------------------------------------------------
+        # 3. Validate Task Assignment
+        # ------------------------------------------------------
 
-        if not subtask:
-            raise ResourceNotFoundException("SubTask")
-
-        if subtask.task_id != payload.task_id:
-            raise ValidationException(
-                "SubTask does not belong to the selected Task."
-            )
-
-        if subtask.employee_id != employee_id:
-            raise ValidationException(
-                "This SubTask is not assigned to you."
-            )
-
-        assignment = (
-            await self.assignment_repo.get_assignment(
-                payload.task_id,
-                employee_id,
-            )
+        assignment = await self.assignment_repo.get_assignment(
+            payload.task_id,
+            employee_id,
         )
 
         if not assignment:
@@ -103,11 +92,47 @@ class TimesheetService:
                 "Task is not assigned to this employee."
             )
 
-        total_hours = (
-            await self.timesheet_repo.total_hours(
-                employee_id,
-                payload.work_date,
+        # ------------------------------------------------------
+        # 4. SubTask is OPTIONAL
+        # ------------------------------------------------------
+
+        subtask = None
+
+        if payload.subtask_id is not None:
+
+            subtask = await self.subtask_repo.get_by_id(
+                payload.subtask_id
             )
+
+            if not subtask:
+                raise ResourceNotFoundException("SubTask")
+
+            # Make sure SubTask belongs to selected Task
+            if subtask.task_id != payload.task_id:
+                raise ValidationException(
+                    "SubTask does not belong to the selected Task."
+                )
+
+            # Make sure SubTask belongs to employee
+            if subtask.employee_id != employee_id:
+                raise ValidationException(
+                    "This SubTask is not assigned to you."
+                )
+
+            # Take default values from SubTask
+            if payload.due_date is None:
+                payload.due_date = subtask.due_date
+
+            if payload.priority is None:
+                payload.priority = subtask.priority
+
+        # ------------------------------------------------------
+        # 5. Validate maximum 12 working hours per day
+        # ------------------------------------------------------
+
+        total_hours = await self.timesheet_repo.total_hours(
+            employee_id,
+            payload.work_date,
         )
 
         if total_hours + payload.actual_hours > 12:
@@ -115,13 +140,9 @@ class TimesheetService:
                 "Maximum 12 working hours allowed per day."
             )
 
-        payload.shared_task_id = str(subtask.id)
-
-        if payload.due_date is None:
-            payload.due_date = subtask.due_date
-
-        if payload.priority is None:
-            payload.priority = subtask.priority
+        # ------------------------------------------------------
+        # 6. Create Timesheet
+        # ------------------------------------------------------
 
         return await self.timesheet_repo.create(
             payload,
@@ -142,9 +163,7 @@ class TimesheetService:
         )
 
         if not timesheet:
-            raise ResourceNotFoundException(
-                "Timesheet"
-            )
+            raise ResourceNotFoundException("Timesheet")
 
         return timesheet
 
@@ -232,10 +251,18 @@ class TimesheetService:
             timesheet_id
         )
 
+        # ------------------------------------------------------
+        # Only owner can update
+        # ------------------------------------------------------
+
         if timesheet.employee_id != employee_id:
             raise ValidationException(
                 "You can update only your own timesheets."
             )
+
+        # ------------------------------------------------------
+        # Only Pending timesheets can be updated
+        # ------------------------------------------------------
 
         if (
             str(timesheet.status) != "Pending"
@@ -250,6 +277,10 @@ class TimesheetService:
             exclude_unset=True
         )
 
+        # ------------------------------------------------------
+        # Validate Project if changed
+        # ------------------------------------------------------
+
         if "project_id" in update_data:
 
             project = await self.project_repo.get_by_id(
@@ -257,9 +288,11 @@ class TimesheetService:
             )
 
             if not project:
-                raise ResourceNotFoundException(
-                    "Project"
-                )
+                raise ResourceNotFoundException("Project")
+
+        # ------------------------------------------------------
+        # Validate Task if changed
+        # ------------------------------------------------------
 
         if "task_id" in update_data:
 
@@ -268,15 +301,11 @@ class TimesheetService:
             )
 
             if not task:
-                raise ResourceNotFoundException(
-                    "Task"
-                )
+                raise ResourceNotFoundException("Task")
 
-            assignment = (
-                await self.assignment_repo.get_assignment(
-                    update_data["task_id"],
-                    employee_id,
-                )
+            assignment = await self.assignment_repo.get_assignment(
+                update_data["task_id"],
+                employee_id,
             )
 
             if not assignment:
@@ -284,31 +313,42 @@ class TimesheetService:
                     "Task is not assigned to this employee."
                 )
 
+        # ------------------------------------------------------
+        # Validate SubTask if changed
+        # ------------------------------------------------------
+
         if "subtask_id" in update_data:
 
-            subtask = await self.subtask_repo.get_by_id(
-                update_data["subtask_id"]
-            )
+            subtask_id = update_data["subtask_id"]
 
-            if not subtask:
-                raise ResourceNotFoundException(
-                    "SubTask"
+            # Allow removing SubTask
+            if subtask_id is not None:
+
+                subtask = await self.subtask_repo.get_by_id(
+                    subtask_id
                 )
 
-            task_id = update_data.get(
-                "task_id",
-                timesheet.task_id,
-            )
+                if not subtask:
+                    raise ResourceNotFoundException("SubTask")
 
-            if subtask.task_id != task_id:
-                raise ValidationException(
-                    "SubTask does not belong to the selected Task."
+                task_id = update_data.get(
+                    "task_id",
+                    timesheet.task_id,
                 )
 
-            if subtask.employee_id != employee_id:
-                raise ValidationException(
-                    "This SubTask is not assigned to you."
-                )
+                if subtask.task_id != task_id:
+                    raise ValidationException(
+                        "SubTask does not belong to the selected Task."
+                    )
+
+                if subtask.employee_id != employee_id:
+                    raise ValidationException(
+                        "This SubTask is not assigned to you."
+                    )
+
+        # ------------------------------------------------------
+        # Validate hours
+        # ------------------------------------------------------
 
         new_hours = update_data.get(
             "actual_hours",
@@ -320,18 +360,20 @@ class TimesheetService:
             timesheet.work_date,
         )
 
-        total_hours = (
-            await self.timesheet_repo.total_hours(
-                employee_id,
-                new_date,
-                exclude_id=timesheet.id,
-            )
+        total_hours = await self.timesheet_repo.total_hours(
+            employee_id,
+            new_date,
+            exclude_id=timesheet.id,
         )
 
         if total_hours + new_hours > 12:
             raise ValidationException(
                 "Maximum 12 working hours allowed per day."
             )
+
+        # ------------------------------------------------------
+        # Updated By
+        # ------------------------------------------------------
 
         update_data["updated_by"] = employee_id
 
@@ -368,16 +410,14 @@ class TimesheetService:
                 "Only pending timesheets can be deleted."
             )
 
-        await self.timesheet_repo.delete(
-            timesheet
-        )
+        await self.timesheet_repo.delete(timesheet)
 
         return {
             "message": "Timesheet deleted successfully."
         }
 
     # ==========================================================
-    # PENDING TIMESHEETS (MANAGER)
+    # PENDING TIMESHEETS - MANAGER
     # ==========================================================
 
     async def pending_timesheets(
@@ -494,9 +534,7 @@ class TimesheetService:
     # TEAM SUMMARY
     # ==========================================================
 
-    async def team_summary(
-        self,
-    ):
+    async def team_summary(self):
 
         return await self.timesheet_repo.team_summary()
 

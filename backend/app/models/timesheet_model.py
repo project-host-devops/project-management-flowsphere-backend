@@ -90,10 +90,10 @@ class Timesheet(Base, FullAuditMixin):
         index=True,
     )
 
-    subtask_id: Mapped[UUIDType] = mapped_column(
+    subtask_id: Mapped[Optional[UUIDType]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("subtasks.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
 
@@ -110,6 +110,16 @@ class Timesheet(Base, FullAuditMixin):
         Date,
         nullable=False,
         index=True,
+    )
+
+    due_date: Mapped[Optional[date]] = mapped_column(
+        Date,
+        nullable=True,
+    )
+
+    actual_completion_date: Mapped[Optional[date]] = mapped_column(
+        Date,
+        nullable=True,
     )
 
     priority: Mapped[Optional[Priority]] = mapped_column(
@@ -232,7 +242,7 @@ class Timesheet(Base, FullAuditMixin):
         lazy="selectin",
     )
 
-    subtask: Mapped["SubTask"] = relationship(
+    subtask: Mapped[Optional["SubTask"]] = relationship(
         "SubTask",
         back_populates="timesheets",
         lazy="selectin",

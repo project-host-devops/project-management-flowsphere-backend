@@ -73,7 +73,6 @@ class TimesheetRepository(BaseRepository):
             project_id=payload.project_id,
             task_id=payload.task_id,
             subtask_id=payload.subtask_id,
-            shared_task_id=payload.shared_task_id,
             deliverable=payload.deliverable,
             work_date=payload.work_date,
             priority=payload.priority,
