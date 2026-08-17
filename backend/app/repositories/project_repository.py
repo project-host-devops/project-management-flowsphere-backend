@@ -229,6 +229,7 @@ class ProjectRepository(BaseRepository):
         )
 
         result = await self.session.scalars(stmt)
+
         members_by_user_id = {
             member.user_id: member
             for member in result.all()
@@ -254,6 +255,7 @@ class ProjectRepository(BaseRepository):
         )
 
         result = await self.session.scalars(stmt)
+
         return result.all()
 
     async def remove_member(
@@ -269,76 +271,76 @@ class ProjectRepository(BaseRepository):
 
         await self.session.execute(stmt)
         await self.session.flush()
-        
 
-        async def get_projects_by_user(
-            self,
-            user_id: UUID,
-        ) -> list[dict]:
+    async def get_projects_by_user(
+        self,
+        user_id: UUID,
+    ) -> list[dict]:
 
-            stmt = (
-                select(Project)
-                .join(ProjectMember)
-                .where(ProjectMember.user_id == user_id)
-                .options(
-                    selectinload(Project.manager),
-                    selectinload(Project.tasks)
-                    .selectinload(Task.assignments),
-                    selectinload(Project.tasks)
-                    .selectinload(Task.subtasks),
-                )
+        stmt = (
+            select(Project)
+            .join(ProjectMember)
+            .where(ProjectMember.user_id == user_id)
+            .options(
+                selectinload(Project.manager),
+                selectinload(Project.tasks)
+                .selectinload(Task.assignments),
+                selectinload(Project.tasks)
+                .selectinload(Task.subtasks),
             )
+        )
 
-            result = await self.session.scalars(stmt)
-            projects = result.unique().all()
+        result = await self.session.scalars(stmt)
 
-            response = []
+        projects = result.unique().all()
 
-            for project in projects:
-                tasks = []
-                subtasks = []
+        response = []
 
-                for task in project.tasks:
+        for project in projects:
+            tasks = []
+            subtasks = []
 
-                    assigned = any(
-                        assignment.user_id == user_id
-                        for assignment in task.assignments
-                    )
+            for task in project.tasks:
 
-                    if not assigned:
-                        continue
+                assigned = any(
+                    assignment.user_id == user_id
+                    for assignment in task.assignments
+                )
 
-                    tasks.append(
-                        {
-                            "id": task.id,
-                            "title": task.title,
-                        }
-                    )
+                if not assigned:
+                    continue
 
-                    for subtask in task.subtasks:
-                        subtasks.append(
-                            {
-                                "id": subtask.id,
-                                "title": subtask.title,
-                            }
-                        )
-
-                response.append(
+                tasks.append(
                     {
-                        "project_id": project.id,
-                        "project_name": project.name,
-                        "description": project.description,
-                        "status": project.status,
-                        "priority": project.priority,
-                        "start_date": project.start_date,
-                        "end_date": project.end_date,
-                        "manager_id": project.manager_id,
-                        "manager_name": project.manager_name,
-                        "tasks": tasks,
-                        "subtasks": subtasks,
-                        "created_at": project.created_at,
-                        "updated_at": project.updated_at,
+                        "id": task.id,
+                        "title": task.title,
                     }
                 )
 
-            return response
+                for subtask in task.subtasks:
+                    subtasks.append(
+                        {
+                            "id": subtask.id,
+                            "title": subtask.title,
+                        }
+                    )
+
+            response.append(
+                {
+                    "project_id": project.id,
+                    "project_name": project.name,
+                    "description": project.description,
+                    "status": project.status,
+                    "priority": project.priority,
+                    "start_date": project.start_date,
+                    "end_date": project.end_date,
+                    "manager_id": project.manager_id,
+                    "manager_name": project.manager_name,
+                    "tasks": tasks,
+                    "subtasks": subtasks,
+                    "created_at": project.created_at,
+                    "updated_at": project.updated_at,
+                }
+            )
+
+        return response
