@@ -303,7 +303,7 @@ class ProjectRepository(BaseRepository):
             for task in project.tasks:
 
                 assigned = any(
-                    assignment.user_id == user_id
+                    assignment.employee_id == user_id
                     for assignment in task.assignments
                 )
 
