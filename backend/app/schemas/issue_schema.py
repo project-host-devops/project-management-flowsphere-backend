@@ -27,7 +27,7 @@ class IssueBase(BaseModel):
     status: IssueStatus = IssueStatus.BACKLOG
 
     due_date: Optional[date] = None
-    story_points: Optional[int] = None
+    story_points: Optional[str] = None
 
 
 class IssueCreate(IssueBase):
@@ -49,7 +49,7 @@ class IssueUpdate(BaseModel):
     status: Optional[IssueStatus] = None
 
     due_date: Optional[date] = None
-    story_points: Optional[int] = None
+    story_points: Optional[str] = None
 
 
 class IssueResponse(IssueBase):
