@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.models.subtask_model import SubTask
 
 from app.models.timesheet_model import (
+    HitMiss,
     Timesheet,
     TimesheetStatus,
     VerificationStatus,
@@ -119,6 +120,14 @@ class TimesheetRepository(BaseRepository):
         await self.session.refresh(timesheet)
 
         return timesheet
+
+    async def delete(
+        self,
+        timesheet: Timesheet,
+    ) -> None:
+
+        await self.session.delete(timesheet)
+        await self.session.flush()
 
     # =========================================================
     # LIST
@@ -387,9 +396,15 @@ class TimesheetRepository(BaseRepository):
 
     async def count_by_status(
         self,
-        status: TimesheetStatus,
+        status: TimesheetStatus | str,
         employee_id: UUID | None = None,
     ) -> int:
+
+        if isinstance(status, str):
+            try:
+                status = TimesheetStatus(status)
+            except ValueError:
+                return 0
 
         stmt = (
             select(func.count(Timesheet.id))
@@ -493,12 +508,11 @@ class TimesheetRepository(BaseRepository):
         employee_id: UUID | None = None,
     ):
 
-        total = await self.session.scalar(
-            select(func.count(Timesheet.id)).where(
-                Timesheet.employee_id == employee_id
-                if employee_id else True
-            )
-        ) or 0
+        stmt = select(func.count(Timesheet.id))
+        if employee_id:
+            stmt = stmt.where(Timesheet.employee_id == employee_id)
+
+        total = await self.session.scalar(stmt) or 0
 
         pending = await self.count_by_status(
             TimesheetStatus.PENDING,
@@ -574,6 +588,61 @@ class TimesheetRepository(BaseRepository):
         self,
     ):
         return await self.dashboard_summary()
+
+    # =========================================================
+    # APPROVE / REJECT
+    # =========================================================
+
+    async def approve(
+        self,
+        timesheet: Timesheet,
+        manager_id: UUID,
+        manager_rating: int | None = None,
+        verification: VerificationStatus | str | None = None,
+        hit_or_miss: HitMiss | str | None = None,
+        remarks: str | None = None,
+    ) -> Timesheet:
+
+        if verification is None:
+            verification = VerificationStatus.VERIFIED
+        elif isinstance(verification, str):
+            verification = VerificationStatus(verification)
+
+        if hit_or_miss is not None and isinstance(hit_or_miss, str):
+            hit_or_miss = HitMiss(hit_or_miss)
+
+        timesheet.status = TimesheetStatus.APPROVED
+        timesheet.verification = verification
+        timesheet.hit_or_miss = hit_or_miss
+        timesheet.manager_rating = manager_rating
+        timesheet.approved_by = manager_id
+        timesheet.updated_by = manager_id
+        if remarks is not None:
+            timesheet.remarks = remarks
+
+        await self.session.flush()
+        await self.session.refresh(timesheet)
+        return timesheet
+
+    async def reject(
+        self,
+        timesheet: Timesheet,
+        manager_id: UUID,
+        rejection_reason: str,
+        remarks: str | None = None,
+    ) -> Timesheet:
+
+        timesheet.status = TimesheetStatus.REJECTED
+        timesheet.verification = VerificationStatus.REWORK_REQUIRED
+        timesheet.approved_by = manager_id
+        timesheet.rejection_reason = rejection_reason
+        timesheet.updated_by = manager_id
+        if remarks is not None:
+            timesheet.remarks = remarks
+
+        await self.session.flush()
+        await self.session.refresh(timesheet)
+        return timesheet
 
     # =========================================================
     # DAILY REPORT

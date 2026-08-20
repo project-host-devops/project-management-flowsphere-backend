@@ -40,6 +40,7 @@ from app.schemas.timesheet_schema import (
     TimesheetListResponse,
     TimesheetReject,
     TimesheetResponse,
+    TimesheetStatus,
     TimesheetUpdate,
 )
 
@@ -594,7 +595,7 @@ async def approved_count(
 
     return {
         "approved": await service.timesheet_repo.count_by_status(
-            "Approved"
+            TimesheetStatus.APPROVED
         )
     }
 
@@ -621,7 +622,7 @@ async def rejected_count(
 
     return {
         "rejected": await service.timesheet_repo.count_by_status(
-            "Rejected"
+            TimesheetStatus.REJECTED
         )
     }
 
