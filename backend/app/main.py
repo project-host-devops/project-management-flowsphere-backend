@@ -19,6 +19,7 @@ from app.api.v1.routers.project import router as project_router
 from app.api.v1.routers.task import router as task_router
 from app.api.v1.routers.timesheets import router as timesheet_router
 from app.api.v1.routers.subtask import router as subtask_router
+from app.api.v1.routers.sprint import router as sprint_router
 
 from app.api.v1.routers.dashboard import router as dashboard_router
 from app.api.v1.routers.departments import router as departments_router
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(submenus_router, prefix="/api/v1")
     app.include_router(project_router, prefix="/api/v1")
     app.include_router(task_router, prefix="/api/v1")
+    app.include_router(sprint_router, prefix="/api/v1")
     app.include_router(departments_router, prefix="/api/v1")
     app.include_router(timesheet_router, prefix="/api/v1")
     app.include_router(subtask_router, prefix="/api/v1")

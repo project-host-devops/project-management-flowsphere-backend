@@ -16,6 +16,8 @@ from .subtask_model import SubTask
 from .email_verification_token_model import EmailVerificationToken
 from .password_reset_token_model import PasswordResetToken
 from .issue_model import Issue
+from .sprint_model import Sprint
+from app.models.sprint_model import Sprint, SprintStatus
 
 __all__ = [
     "Base",
@@ -36,6 +38,7 @@ __all__ = [
     "PasswordResetToken",
     "SubTask",
     "Issue",
+    "Sprint",
     "EmailVerificationToken",
     "PasswordResetToken",
 ]
